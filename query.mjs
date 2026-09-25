@@ -152,7 +152,7 @@ if (opt.exc) params.set('x', opt.exc);
 const changed = d.nodes.filter(n => n.state && !['test', 'unit_test'].includes(n.type)).length;
 console.log(`${path.basename(dir)} · ${d.branch} · ${b ? `vs ${b.ref}@${b.sha.slice(0, 7)}${b.status === 'ready' ? '' : ` (diff ${b.status})`}` : 'no git base'}`);
 console.log(`url: ${server}/?${params}`);
-console.log(`${rows.length} nodes selected${opt.tests ? '' : ' (tests hidden)'} · ${changed} changed in project${d.removed?.length ? ` · removed: ${d.removed.join(', ')}` : ''}`);
+console.log(`${rows.length} node${rows.length === 1 ? '' : 's'} selected${opt.tests ? '' : ' (tests hidden)'} · ${changed} changed in project${d.removed?.length ? ` · removed: ${d.removed.join(', ')}` : ''}`);
 if (u) {
   const counts = {};
   for (const n of rows) { const v = summarize(u, g, n.id, opt.win).verdict; if (v) counts[v] = (counts[v] || 0) + 1; }

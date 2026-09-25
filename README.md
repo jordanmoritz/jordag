@@ -117,7 +117,7 @@ jordag query --column customers.lifetime_value --up
 
 To put the skills somewhere else, use `jordag setup --skills <dir>`. `--no-skills` skips them.
 
-`jordag stop` stops the background server, and `jordag restart` restarts it; run that after updating jordag.
+`jordag status` shows which copy you're running, its config, cache and port, and whether a server is up. `jordag stop` stops the background server, and `jordag restart` restarts it; run that after updating jordag.
 
 ## How it works
 

@@ -7,8 +7,9 @@
   jordag setup        link the `jordag` command into ~/.local/bin and the agent skills into ~/.claude/skills
                       (--bin DIR, --skills DIR, --no-skills)
   jordag query ...    DAG / usage / column-lineage lookups from the terminal (see `jordag query --help`)
+  jordag status       which copy this is, its config/cache/port, and whether a server (and whose) is running
   jordag serve        run the server in the foreground
-  jordag stop | restart
+  jordag stop | restart   (--force to stop another copy's server on this port)
 
 Optional config: ~/.config/jordag/config.json (see config.example.json). Env: JORDAG_CONFIG, JORDAG_PORT,
 JORDAG_ROOTS (colon-separated), JORDAG_DBT (dbt binary), METABASE_API_KEY (dashboard/question names).
@@ -899,7 +900,22 @@ def setup(args):
     print('  next     cd into a dbt project and run: jordag')
 
 
+def status():
+    pong = call('/api/ping')
+    me = os.path.realpath(HERE / 'jordag.py')
+    on_path = shutil.which('jordag')
+    server = 'not running' if not pong else 'running, this copy' if pong.get('home') == str(HERE) \
+        else 'running, ANOTHER copy: %s' % (pong.get('home') or 'an older jordag')
+    path = 'not on PATH' if not on_path else 'this copy' if os.path.realpath(on_path) == me \
+        else 'ANOTHER copy: %s' % os.path.realpath(on_path)
+    for k, v in (('this copy', me), ('config', '%s (%s)' % (CONFIG_PATH, 'found' if CONFIG_PATH.is_file() else 'not found, using defaults')),
+                 ('cache', CACHE), ('port', PORT), ('server', server), ('on PATH', path)):
+        print('  %-10s %s' % (k, v))
+
+
 def main():
+    if sys.argv[1:2] == ['status']:
+        return status()
     if sys.argv[1:2] == ['query']:
         if not shutil.which('node'):
             sys.exit('jordag query needs node (https://nodejs.org)')
@@ -914,6 +930,11 @@ def main():
     if args[:1] == ['serve']:
         return serve()
     if args[:1] in (['stop'], ['restart']):
+        pong = call('/api/ping')
+        if pong and pong.get('home') != str(HERE) and '--force' not in flags:
+            sys.exit('jordag: port %d is served by another jordag (%s), so %s left it alone.\n'
+                     '  It may be someone\'s running copy. Add --force to %s it anyway.'
+                     % (PORT, pong.get('home') or 'an older version', args[0], args[0]))
         running = call('/api/quit', 'POST')
         for _ in range(20):
             if not call('/api/ping'):
@@ -935,9 +956,12 @@ def main():
             sys.exit('jordag: server failed to start, see %s' % (CACHE / 'server.log'))
     pong = call('/api/ping') or {}
     if pong.get('home') != str(HERE):
+        me = os.path.realpath(HERE / 'jordag.py')
         sys.stderr.write('jordag: port %d is served by another jordag (%s).\n'
-                         '  To run this copy alongside it: JORDAG_PORT=<free port> jordag ...\n'
-                         '  To replace it with this copy:  jordag restart\n' % (PORT, pong.get('home') or 'an older version'))
+                         '  Run this copy beside it:\n'
+                         '    JORDAG_PORT=<free port> XDG_CACHE_HOME=<dir> JORDAG_CONFIG=<dir>/config.json python3 %s ...\n'
+                         '  Or replace it (it may be someone\'s running copy; ask first):\n'
+                         '    python3 %s restart --force\n' % (PORT, pong.get('home') or 'an older version', me, me))
         sys.exit(2)
     here = Path(args[0] if args else '.').resolve()
     proj = next((d for d in [here, *here.parents] if (d / 'dbt_project.yml').is_file()), None)
