@@ -98,13 +98,13 @@ python3 jordag.py stop
 | Command | Expect |
 |---------|--------|
 | `node test.mjs` | `selector ok` and `usage ok` |
-| `query -p demo -s '+customers'` | `8 nodes selected (tests hidden)`, then 5 model rows and 3 source rows |
+| `query -p demo -s '+customers'` | a line starting `8 nodes selected (tests hidden)`, then 5 model rows and 3 source rows. It's the first query, so it takes a few seconds: it starts the server and parses the project |
 | `query -p demo --column customers.lifetime_value` | `upstream (3):`, ending at `shop.raw_payments.amount` |
 | `query -p demo -s orders --usage` | `Usage reads Snowflake ACCESS_HISTORY; this project uses duckdb.` and exit code 1 |
 | `--print demo` | a URL on this checkout's port |
 | first `curl` | `<!doctype html>` |
 | second `curl` | `13 nodes` (the API includes tests; `query` hides them) |
-| `stop` | `jordag: stopped the server on port <port>` |
+| `stop` | `jordag: stopped the server on port <port>`; other copies' servers are unaffected |
 
 What to expect along the way:
 - **pip noise:** pip may warn about its own version, or LibreSSL on macOS's system Python. Both are harmless.
@@ -117,7 +117,7 @@ What to expect along the way:
 - **README examples:** they're written for a person with `jordag` on `PATH`, standing inside a project. You're at the repo root, so write `python3 jordag.py` for `jordag` and add `-p demo`, e.g. `python3 jordag.py query -p demo --column customers.lifetime_value --up`. For the README's "Try it on the demo", that's `python3 jordag.py --print demo`.
   The `--usage` example exits 1 on the demo with the Snowflake-only message, which is expected.
 
-**What setup leaves behind** (all gitignored): `.jordag-local.json` if you sandboxed, `demo/.venv/`, `demo/demo.duckdb`, plus the sandbox folder or the links in `~/.local/bin` and `~/.claude/skills`. Delete them to undo.
+**What setup leaves behind**: in the repo (all gitignored), `.jordag-local.json` if you sandboxed, `demo/.venv/`, and `demo/demo.duckdb`. Outside it, the sandbox folder, or the links in `~/.local/bin` and `~/.claude/skills`. Delete them to undo.
 
 Anything you run after step 3's `stop` (the README examples, say) starts the server again, so run `python3 jordag.py stop` once more when you're finished.
 
