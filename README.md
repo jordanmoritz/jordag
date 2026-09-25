@@ -38,7 +38,7 @@ The repo includes a tiny DuckDB project, so there's no warehouse to set up:
 
 ```bash
 python3 -m venv demo/.venv && demo/.venv/bin/pip install dbt-duckdb sqlglot
-cd demo && jordag
+cd demo && jordag      # or `python3 ../jordag.py` if this checkout is a sandbox (see AGENTS.md)
 ```
 
 Try the column view: `jordag query --column customers.lifetime_value` prints the trace and a link that opens it.

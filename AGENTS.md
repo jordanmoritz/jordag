@@ -37,7 +37,7 @@ This links `~/.local/bin/jordag` and `~/.claude/skills/jordag*`.
 **If any line says `ANOTHER copy`**, the user already runs jordag. Don't touch it. Install this checkout into a sandbox folder of your own instead:
 
 ```bash
-python3 jordag.py setup --sandbox /path/to/a/new/folder
+python3 jordag.py setup --sandbox ../jordag-sandbox    # any new folder outside the repo
 ```
 
 This gives this checkout:
@@ -53,7 +53,11 @@ Afterwards, `python3 jordag.py status` should show:
 
 `on PATH` still names the other copy. That's fine; just never run the bare `jordag` command, because it's the user's.
 
-In either case, `missing dbt` in setup's output is expected when dbt lives in project virtualenvs. The demo gets one next.
+The skills linked into the sandbox folder are only there so you can check the links. Agents never load them from there, and they would call the bare `jordag` anyway.
+
+Re-running `setup --sandbox` is safe: it stops this sandbox's server and moves it to a new free port.
+
+In either case, setup ends by checking for dbt, node and git. `missing dbt` is expected when dbt lives in project virtualenvs; the demo gets one next.
 
 ## 3. Verify with the demo project
 
@@ -70,11 +74,12 @@ python3 jordag.py stop                                            # expect: "sto
 
 What to expect along the way:
 - **pip noise:** pip may warn about its own version, or LibreSSL on macOS's system Python. Both are harmless.
-- **Server:** the first `query` starts a background server on this checkout's port.
+- **Server:** any `query` or `--print` starts the background server on this checkout's port if it isn't running, including after `stop`.
 - **Output:** every successful `query` prints a `url:` line near the top, which opens the same view in the browser.
 - **Column trace:** the first `--column` run compiles the demo and traces every column, which takes a few seconds. dbt-duckdb creates `demo/demo.duckdb` (gitignored).
 - **Usage:** `--usage` exits 1 on non-Snowflake projects, so don't chain it with `&&`.
 - **Browser:** to show the user the UI, run `python3 jordag.py demo`, which opens their browser.
+- **README examples:** they're written to run from inside a project. From the repo root, add `-p demo`, e.g. `python3 jordag.py query -p demo --column customers.lifetime_value --up`.
 
 **Exit code 2** means another jordag owns the port. jordag refuses to use, stop, or restart another copy's server unless you pass `--force`. Ask the user before forcing, since it may be their running copy.
 
@@ -101,7 +106,7 @@ For Metabase dashboard names, the user sets `METABASE_API_KEY` in their shell an
 
 ## HTTP API
 
-`jordag query` is the supported interface. For scripts, the server's JSON endpoints all take `p=<url-encoded project path>`:
+`jordag query` is the supported interface. For scripts, the server's JSON endpoints all take `p=<url-encoded absolute path of the dbt project>`:
 - `/api/projects`
 - `/api/graph?p=`
 - `/api/node?p=&id=<unique_id>`
@@ -113,7 +118,7 @@ For Metabase dashboard names, the user sets `METABASE_API_KEY` in their shell an
 | Symptom | Fix |
 |---------|-----|
 | Exit code 2: `port … is served by another jordag` | Another copy, or an older version of this one, owns the port. Use `setup --sandbox` (step 2), or, with the user's OK, `restart --force` |
-| `server failed to start` | See `server.log` in the cache folder that `status` shows. Usually the port is taken by something that isn't jordag: rerun `setup --sandbox` to pick another port |
+| `server failed to start` | See `server.log` in the cache folder that `status` shows. Usually the port is taken by something that isn't jordag: rerun `setup --sandbox` to move to another free port |
 | Red "parse error" pill | The project's own `dbt parse` fails. Click the pill for the output |
 | Columns view: `No python with sqlglot` | `pip install sqlglot` into the project's dbt venv, or install `uv` |
 | Changes to jordag's own code don't show | `python3 jordag.py restart` |

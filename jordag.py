@@ -895,6 +895,8 @@ def setup(args):
     box = opt('--sandbox', '') if '--sandbox' in args else None
     if box:
         box.mkdir(parents=True, exist_ok=True)
+        if LOCAL and (call('/api/ping') or {}).get('home') == str(HERE):
+            call('/api/quit', 'POST')  # re-running: stop this sandbox's server before it moves to a new port
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
             port = sock.getsockname()[1]
@@ -906,6 +908,10 @@ def setup(args):
         for d in sorted((HERE / 'skills').iterdir()):
             if (d / 'SKILL.md').is_file():
                 link((box / 'skills' if box else opt('--skills', '~/.claude/skills')) / d.name, d)
+    for tool, why in (('dbt', 'parsing projects (or keep dbt in a .venv / venv inside each project)'),
+                      ('node', '`jordag query` and the agent skills'), ('git', 'worktrees and state:modified')):
+        if not shutil.which(tool):
+            print('  missing  %s: needed for %s' % (tool, why))
     if box:
         print('\n  sandbox  port %d, cache %s, config %s (optional, may not exist)' % (port, box / 'cache', box / 'config.json'))
         print('           saved in %s; delete it to undo' % LOCAL_FILE)
@@ -918,10 +924,6 @@ def setup(args):
     elif on_path and os.path.realpath(on_path) != os.path.realpath(HERE / 'jordag.py'):
         print('\n  note: `jordag` on your PATH is a different copy (%s); run %s to use this one'
               % (os.path.realpath(on_path), bin_dir / 'jordag'))
-    for tool, why in (('dbt', 'parsing projects (or keep dbt in a .venv / venv inside each project)'),
-                      ('node', '`jordag query` and the agent skills'), ('git', 'worktrees and state:modified')):
-        if not shutil.which(tool):
-            print('  missing  %s: needed for %s' % (tool, why))
     print('\n  config   %s (optional; see %s)' % (CONFIG_PATH, HERE / 'config.example.json'))
     print('  next     cd into a dbt project and run: jordag')
 
@@ -991,7 +993,7 @@ def main():
         sys.exit(2)
     here = Path(args[0] if args else '.').resolve()
     proj = next((d for d in [here, *here.parents] if (d / 'dbt_project.yml').is_file()), None)
-    url = 'http://127.0.0.1:%d/' % PORT + ('?p=' + urllib.parse.quote(str(proj)) if proj else '')
+    url = 'http://127.0.0.1:%d/' % PORT + ('?p=' + urllib.parse.quote(str(proj), safe='') if proj else '')
     print(url)
     if '--print' not in flags:
         webbrowser.open(url)
