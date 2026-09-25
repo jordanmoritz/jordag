@@ -38,7 +38,7 @@ The repo includes a tiny DuckDB project, so there's no warehouse to set up:
 
 ```bash
 python3 -m venv demo/.venv && demo/.venv/bin/pip install dbt-duckdb sqlglot
-cd demo && jordag      # in a sandbox checkout (see AGENTS.md), use `python3 ../jordag.py` wherever this README says `jordag`
+cd demo && jordag      # agents and sandbox checkouts: see AGENTS.md for how to run this checkout instead
 ```
 
 Try the column view: `jordag query --column customers.lifetime_value` prints the trace and a link that opens it.
@@ -78,7 +78,7 @@ Switch views with the buttons at the top, or the keys `g` / `u` / `c`. The `--se
 
 ## Configuration
 
-Everything works with no config except Usage, which needs to know how production is named. Create `~/.config/jordag/config.json` (see [`config.example.json`](config.example.json)):
+Everything works with no config except Usage, which needs to know how production is named. Create `~/.config/jordag/config.json`, or whatever path `jordag status` shows (see [`config.example.json`](config.example.json)):
 
 | Key | What it does |
 |-----|--------------|
@@ -93,7 +93,7 @@ Everything works with no config except Usage, which needs to know how production
 
 Environment variables:
 - `METABASE_API_KEY`: shows dashboard and question names instead of IDs.
-- `JORDAG_PORT`, `JORDAG_ROOTS` (colon-separated), `JORDAG_CONFIG`: override the config file.
+- `JORDAG_PORT`, `JORDAG_ROOTS` (colon-separated), `JORDAG_CONFIG`: override the config file. In a sandbox checkout (`setup --sandbox`), its own port, cache and config win over these.
 - `JORDAG_DBT`: which dbt binary to use.
 - `XDG_CACHE_HOME`: where the cache lives.
 

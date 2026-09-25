@@ -2,7 +2,15 @@
 
 Follow these steps in order to install jordag for a user and prove it works. Every command is non-interactive. Run them from the repo root.
 
-Every command in steps 2 and 3 runs this checkout as `python3 jordag.py ...`, so they work the same whether or not another jordag is installed. Keep it that way: a bare `jordag` on `PATH` may be a different copy.
+Every jordag command in steps 2 and 3 runs this checkout as `python3 jordag.py ...`, so they work the same whether or not another jordag is installed. Keep it that way: a bare `jordag` on `PATH` may be a different copy.
+
+## 0. Get the code
+
+```bash
+git clone https://github.com/jordanmoritz/jordag.git && cd jordag
+```
+
+If the repo is private to the user and git has no credential helper, use `gh repo clone jordanmoritz/jordag && cd jordag` instead, so nothing prompts for a password.
 
 ## 1. Check prerequisites
 
@@ -52,7 +60,7 @@ Afterwards, `python3 jordag.py status` should show:
 - `config` and `cache` inside your sandbox folder, and a `port` that isn't the other copy's
 - `server not running` (or `running, this copy` once you've used it)
 
-`on PATH` still names the other copy. That's fine; just never run the bare `jordag` command, because it's the user's.
+`on PATH` still names the other copy. That's fine; just never run the bare `jordag` command, because it's the user's. Setup also prints `<sandbox>/bin/jordag` as a second way to run this checkout; it's the same copy as `python3 jordag.py`, so either works.
 
 The skills linked into the sandbox folder are only there so you can check the links. Agents never load them from there, and they would call the bare `jordag` anyway.
 
@@ -70,6 +78,7 @@ python3 jordag.py query -p demo -s '+customers'                   # expect: "8 n
 python3 jordag.py query -p demo --column customers.lifetime_value # expect: "upstream (3)", ending at shop.raw_payments.amount
 python3 jordag.py query -p demo -s orders --usage                 # expect: "Usage reads Snowflake ACCESS_HISTORY; this project uses duckdb." and exit code 1
 python3 jordag.py --print demo                                    # expect: a URL on this checkout's port; curl it to get the HTML page
+curl -s "$(python3 jordag.py --print demo | sed 's/?.*//')api/graph?p=$(python3 -c 'import urllib.parse,os;print(urllib.parse.quote(os.path.abspath("demo"),safe=""))')" | head -c 200   # expect: JSON with "nodes"
 python3 jordag.py stop                                            # expect: "stopped the server on port …"
 ```
 
@@ -79,8 +88,8 @@ What to expect along the way:
 - **Output:** every successful `query` prints a `url:` line near the top, which opens the same view in the browser.
 - **Column trace:** the first `--column` run compiles the demo and traces every column, which takes a few seconds. dbt-duckdb creates `demo/demo.duckdb` (gitignored).
 - **Usage:** `--usage` exits 1 on non-Snowflake projects, so don't chain it with `&&`.
-- **Browser:** to show the user the UI, run `python3 jordag.py demo`, which opens their browser.
-- **README examples:** they're written to run from inside a project. From the repo root, add `-p demo`, e.g. `python3 jordag.py query -p demo --column customers.lifetime_value --up`.
+- **Browser:** a bare `python3 jordag.py <project>` opens the user's browser, so use `--print` unless you mean to show them the UI.
+- **README examples:** they're written for a person with `jordag` on `PATH`, standing inside a project. You're at the repo root, so write `python3 jordag.py` for `jordag` and add `-p demo`, e.g. `python3 jordag.py query -p demo --column customers.lifetime_value --up`. For the README's "Try it on the demo", that's `python3 jordag.py --print demo`.
   The `--usage` example exits 1 on the demo with the Snowflake-only message, which is expected.
 
 **Exit code 2** means another jordag owns the port. jordag refuses to use, stop, or restart another copy's server unless you pass `--force`. Ask the user before forcing, since it may be their running copy.
