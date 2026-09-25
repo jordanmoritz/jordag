@@ -23,12 +23,12 @@ If that fails with an authentication error, the repo is private: ask the user to
 ## 1. Check prerequisites
 
 ```bash
-python3 --version   # 3.9 or newer
+python3 --version
 git --version
-node --version      # 18 or newer (needed for `jordag query` and the skills)
+node --version
 ```
 
-If Python is older than 3.9, stop and tell the user; jordag needs 3.9+.
+jordag needs Python 3.9 or newer; if it's older, stop and tell the user. Node needs to be 18 or newer.
 
 If `node` is missing, the viewer still works, but `jordag query` and the skills don't. Tell the user. In step 3, skip `node test.mjs` and the `query` lines; `--print`, the two `curl` checks, and `stop` still verify the install.
 
@@ -52,10 +52,10 @@ This links `~/.local/bin/jordag` and `~/.claude/skills/jordag*`.
 - Run `python3 jordag.py status` again. `on PATH` should say `this copy`.
 - If it says `not on PATH`, tell the user to add `~/.local/bin` to their `PATH`. Everything below still works.
 
-**If any line says `ANOTHER copy`**, the user already runs jordag. Don't touch it. Install this checkout into a sandbox folder of your own instead:
+**If any line says `ANOTHER copy`**, the user already runs jordag. Don't touch it. Install this checkout into a sandbox folder of your own instead. Any new folder outside the repo works, and a relative path is fine:
 
 ```bash
-python3 jordag.py setup --sandbox ../jordag-sandbox    # any new folder outside the repo (relative paths are fine)
+python3 jordag.py setup --sandbox ../jordag-sandbox
 ```
 
 This gives this checkout:
@@ -76,28 +76,41 @@ The skills linked into the sandbox folder are only there so you can check the li
 
 Re-running `setup --sandbox` is safe: it stops this sandbox's server and moves it to a new free port.
 
-In either case, setup ends by checking for dbt, node and git. It only prints the missing ones, so no `missing` line means all three were found. `missing dbt` is expected when dbt lives in project virtualenvs; the demo gets one next.
+In either case, setup also checks for dbt, node and git. It only prints the missing ones, so no `missing` line means all three were found. `missing dbt` is expected when dbt lives in project virtualenvs; the demo gets one next.
 
 ## 3. Verify with the demo project
+
+Run these one at a time. The `--usage` line exits 1 by design, so don't chain them with `&&` or run the block under `set -e`.
 
 ```bash
 python3 -m venv demo/.venv
 demo/.venv/bin/pip install dbt-duckdb sqlglot
-node test.mjs                                                     # expect: "selector ok" and "usage ok"
-python3 jordag.py query -p demo -s '+customers'                   # expect: "8 nodes selected" (5 model rows, 3 source rows)
-python3 jordag.py query -p demo --column customers.lifetime_value # expect: "upstream (3)", ending at shop.raw_payments.amount
-python3 jordag.py query -p demo -s orders --usage                 # expect: "Usage reads Snowflake ACCESS_HISTORY; this project uses duckdb." and exit code 1
-python3 jordag.py --print demo                                    # expect: a URL on this checkout's port
-curl -s "$(python3 jordag.py --print demo)" | head -c 15                           # expect: <!doctype html>
-curl -s "$(python3 jordag.py --print demo | sed 's/?.*//')api/graph?p=$(python3 -c 'import urllib.parse,os;print(urllib.parse.quote(os.path.abspath("demo"),safe=""))')" \
-  | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["nodes"]), "nodes")'   # expect: 13 nodes (tests included)
-python3 jordag.py stop                                            # expect: "stopped the server on port …"
+node test.mjs
+python3 jordag.py query -p demo -s '+customers'
+python3 jordag.py query -p demo --column customers.lifetime_value
+python3 jordag.py query -p demo -s orders --usage
+python3 jordag.py --print demo
+curl -s "$(python3 jordag.py --print demo)" | head -c 15
+curl -s "$(python3 jordag.py --print demo | sed 's/?.*//')api/graph?p=$(python3 -c 'import urllib.parse,os;print(urllib.parse.quote(os.path.abspath("demo"),safe=""))')" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["nodes"]), "nodes")'
+python3 jordag.py stop
 ```
+
+| Command | Expect |
+|---------|--------|
+| `node test.mjs` | `selector ok` and `usage ok` |
+| `query -p demo -s '+customers'` | `8 nodes selected (tests hidden)`, then 5 model rows and 3 source rows |
+| `query -p demo --column customers.lifetime_value` | `upstream (3):`, ending at `shop.raw_payments.amount` |
+| `query -p demo -s orders --usage` | `Usage reads Snowflake ACCESS_HISTORY; this project uses duckdb.` and exit code 1 |
+| `--print demo` | a URL on this checkout's port |
+| first `curl` | `<!doctype html>` |
+| second `curl` | `13 nodes` (the API includes tests; `query` hides them) |
+| `stop` | `jordag: stopped the server on port <port>` |
 
 What to expect along the way:
 - **pip noise:** pip may warn about its own version, or LibreSSL on macOS's system Python. Both are harmless.
 - **Server:** any `query` or `--print` starts the background server on this checkout's port if it isn't running, including after `stop`.
 - **Output:** every successful `query` prints a `url:` line near the top, which opens the same view in the browser.
+- **After edits:** `query` waits for any pending re-parse, so there's no need to sleep after editing a model before querying it.
 - **Column trace:** the first `--column` run compiles the demo and traces every column, which takes a few seconds. dbt-duckdb creates `demo/demo.duckdb` (gitignored).
 - **Usage:** `--usage` exits 1 on non-Snowflake projects, so don't chain it with `&&`.
 - **Browser:** a bare `python3 jordag.py <project>` opens the user's browser, so use `--print` unless you mean to show them the UI.
@@ -105,6 +118,8 @@ What to expect along the way:
   The `--usage` example exits 1 on the demo with the Snowflake-only message, which is expected.
 
 **What setup leaves behind** (all gitignored): `.jordag-local.json` if you sandboxed, `demo/.venv/`, `demo/demo.duckdb`, plus the sandbox folder or the links in `~/.local/bin` and `~/.claude/skills`. Delete them to undo.
+
+Anything you run after step 3's `stop` (the README examples, say) starts the server again, so run `python3 jordag.py stop` once more when you're finished.
 
 **Exit code 2** means another jordag owns the port. jordag refuses to use, stop, or restart another copy's server unless you pass `--force`. Ask the user before forcing, since it may be their running copy.
 

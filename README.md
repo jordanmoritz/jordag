@@ -21,8 +21,10 @@ You need:
 ```bash
 git clone https://github.com/jordanmoritz/jordag.git
 cd jordag
-python3 jordag.py setup        # links the `jordag` command into ~/.local/bin and the agent skills into ~/.claude/skills
+python3 jordag.py setup
 ```
+
+`setup` links the `jordag` command into `~/.local/bin` and the agent skills into `~/.claude/skills`.
 
 Already have jordag installed? Run `python3 jordag.py status` first; to try this checkout beside the other one, use `python3 jordag.py setup --sandbox <folder>`. Setting it up with an agent? Point it at [AGENTS.md](AGENTS.md).
 
@@ -40,8 +42,10 @@ The repo includes a tiny DuckDB project, so there's no warehouse to set up:
 
 ```bash
 python3 -m venv demo/.venv && demo/.venv/bin/pip install dbt-duckdb sqlglot
-cd demo && jordag      # agents and sandbox checkouts: see AGENTS.md for how to run this checkout instead
+cd demo && jordag
 ```
+
+(Agents and sandbox checkouts: see [AGENTS.md](AGENTS.md) for how to run this checkout instead.)
 
 Try the column view: `jordag query --column customers.lifetime_value` prints the trace and a link that opens it.
 
@@ -112,10 +116,15 @@ Environment variables:
 They all run `jordag query`, which you can use yourself:
 
 ```bash
-jordag query -s '1+state:modified+'                    # what my branch changed (empty until you change a model)
-jordag query -s 'path:models/marts' --usage --verdict unused   # Snowflake projects only
+jordag query -s '1+state:modified+'
+jordag query -s 'path:models/marts' --usage --verdict unused
 jordag query --column customers.lifetime_value --up
 ```
+
+These show, in order:
+1. What your branch changed. It's empty until you change a model.
+2. Unused models in a folder. This one is Snowflake-only.
+3. Where a column comes from.
 
 To put the skills somewhere else, use `jordag setup --skills <dir>`. `--no-skills` skips them.
 
