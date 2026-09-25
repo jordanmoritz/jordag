@@ -935,8 +935,10 @@ def main():
             sys.exit('jordag: server failed to start, see %s' % (CACHE / 'server.log'))
     pong = call('/api/ping') or {}
     if pong.get('home') != str(HERE):
-        print('jordag: port %d is already served by %s; set JORDAG_PORT to run this copy instead'
-              % (PORT, pong.get('home') or 'another jordag'), file=sys.stderr)
+        sys.stderr.write('jordag: port %d is served by another jordag (%s).\n'
+                         '  To run this copy alongside it: JORDAG_PORT=<free port> jordag ...\n'
+                         '  To replace it with this copy:  jordag restart\n' % (PORT, pong.get('home') or 'an older version'))
+        sys.exit(2)
     here = Path(args[0] if args else '.').resolve()
     proj = next((d for d in [here, *here.parents] if (d / 'dbt_project.yml').is_file()), None)
     url = 'http://127.0.0.1:%d/' % PORT + ('?p=' + urllib.parse.quote(str(proj)) if proj else '')

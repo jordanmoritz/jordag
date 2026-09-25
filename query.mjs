@@ -41,7 +41,13 @@ while (!existsSync(path.join(dir, 'dbt_project.yml'))) {
 dir = realpathSync(dir);
 
 // starts the server if needed; its printed URL carries the port
-const server = new URL(execFileSync('python3', [path.join(repo, 'jordag.py'), '--print', dir]).toString().trim()).origin;
+let printed;
+try {
+  printed = execFileSync('python3', [path.join(repo, 'jordag.py'), '--print', dir]).toString().trim();
+} catch (e) {
+  process.exit(e.status || 1);  // jordag.py already explained why on stderr
+}
+const server = new URL(printed).origin;
 const get = p => fetch(server + p).then(r => r.json());
 const q = `p=${encodeURIComponent(dir)}`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));

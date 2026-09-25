@@ -62,13 +62,13 @@ Switch views with the buttons at the top, or the keys `g` / `u` / `c`. The `--se
   - **Team:** people poking around.
   - **Pipeline:** dbt and loaders, detected from writes.
   - **Other:** everything else.
-- **Verdicts:**
-  - **unused:** no readers and nothing downstream
-  - **no activity:** nothing in 90 days
-  - **team only**
-  - **pipeline**
-  - **active**
-  - **not in prod**
+- **Verdicts** (the value in brackets is what `jordag query --verdict` takes):
+  - **unused** (`unused`): no readers and nothing downstream
+  - **no activity** (`dormant`): nothing in 90 days
+  - **team only** (`team`)
+  - **pipeline** (`pipeline`)
+  - **active** (`active`)
+  - **not in prod** (`new`)
 - **Metabase:** dashboard and question IDs are read from Metabase's query comments. Dashboards that no dbt exposure declares are flagged *undeclared*.
 - **Lens:** the ◐ **Usage lens** in the Graph toolbar shades each node by how much it's read.
 
@@ -116,6 +116,8 @@ jordag query --column customers.lifetime_value --up
 ```
 
 To put the skills somewhere else, use `jordag setup --skills <dir>`. `--no-skills` skips them.
+
+`jordag stop` stops the background server, and `jordag restart` restarts it; run that after updating jordag.
 
 ## How it works
 
