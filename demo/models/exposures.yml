@@ -1,0 +1,10 @@
+exposures:
+  - name: weekly_revenue
+    label: Weekly revenue
+    type: dashboard
+    url: https://bi.example.com/dashboard/1
+    owner:
+      name: Analytics
+    depends_on:
+      - ref('orders')
+      - ref('customers')

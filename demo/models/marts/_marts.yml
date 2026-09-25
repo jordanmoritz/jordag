@@ -1,0 +1,17 @@
+models:
+  - name: orders
+    description: One row per order, with what was paid.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: amount
+        description: Total paid for the order, in dollars.
+      - name: credit_card_amount
+        description: The part of amount paid by credit card.
+  - name: customers
+    description: One row per customer, with their order history.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: lifetime_value
+        description: Everything the customer has paid, in dollars.

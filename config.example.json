@@ -1,0 +1,10 @@
+{
+  "roots": ["~/code"],
+  "prod_database": "ANALYTICS",
+  "prod_schema": "PROD",
+  "prod_schema_style": "custom",
+  "consumer_roles": ["BI_READER"],
+  "legacy_consumer_roles": [],
+  "team_roles": ["ANALYST"],
+  "metabase_url": "https://metabase.example.com"
+}

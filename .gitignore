@@ -1,0 +1,7 @@
+__pycache__/
+demo/target/
+demo/logs/
+demo/dbt_packages/
+demo/.venv/
+demo/*.duckdb*
+demo/.user.yml

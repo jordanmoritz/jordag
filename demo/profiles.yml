@@ -1,0 +1,7 @@
+demo_shop:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: demo.duckdb
+      threads: 1

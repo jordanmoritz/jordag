@@ -1,0 +1,12 @@
+# A tiny shop, just big enough to show off jordag. Runs on DuckDB, so there's no warehouse to set up.
+name: demo_shop
+version: '1.0.0'
+config-version: 2
+profile: demo_shop
+
+models:
+  demo_shop:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
