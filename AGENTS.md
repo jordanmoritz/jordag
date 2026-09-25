@@ -1,6 +1,8 @@
 # Setting up jordag (for AI agents)
 
-Follow these steps in order to install jordag for a user and prove it works. Every command is non-interactive. Run them from the repo root unless a step says otherwise.
+Follow these steps in order to install jordag for a user and prove it works. Every command is non-interactive. Run them from the repo root.
+
+Every command in steps 2 and 3 runs this checkout as `python3 jordag.py ...`, so they work the same whether or not another jordag is installed. Keep it that way: a bare `jordag` on `PATH` may be a different copy.
 
 ## 1. Check prerequisites
 
@@ -12,7 +14,7 @@ node --version      # 18 or newer (needed for `jordag query` and the skills)
 
 If `node` is missing, the viewer still works but the skills won't. Tell the user.
 
-## 2. Check for another copy, then install
+## 2. Install
 
 Developers often already have jordag installed or running. Check first:
 
@@ -20,66 +22,73 @@ Developers often already have jordag installed or running. Check first:
 python3 jordag.py status
 ```
 
-This prints which copy this is, the config, cache and port it would use, whether a server is running on that port (and whose), and which `jordag` is on `PATH`.
+It prints this checkout's config, cache and port, whether a server is running there (and whose), and which `jordag` is on `PATH`.
 
-**If nothing says `ANOTHER copy`**, install normally:
-
-```bash
-python3 jordag.py setup     # links ~/.local/bin/jordag and ~/.claude/skills/jordag*
-```
-
-Then run `python3 jordag.py status` again. `on PATH` should say `this copy`. If it says `not on PATH`, tell the user to add `~/.local/bin` to `PATH`, and use `python3 <repo>/jordag.py` wherever these steps say `jordag`.
-
-**If anything says `ANOTHER copy`**, don't touch it. Install side by side into a folder of your own, and give this copy its own port, cache, and config:
+**If no line says `ANOTHER copy`**, do a normal install:
 
 ```bash
-SANDBOX=/path/to/a/new/folder
-python3 jordag.py setup --bin $SANDBOX/bin --skills $SANDBOX/skills
+python3 jordag.py setup
 ```
 
-From here on, run every `jordag` command in this form. Agent shells often don't keep `export`s or `cd`s between calls, so put everything on each line:
+This links `~/.local/bin/jordag` and `~/.claude/skills/jordag*`.
+- Run `python3 jordag.py status` again. `on PATH` should say `this copy`.
+- If it says `not on PATH`, tell the user to add `~/.local/bin` to their `PATH`. Everything below still works.
+
+**If any line says `ANOTHER copy`**, the user already runs jordag. Don't touch it. Install this checkout into a sandbox folder of your own instead:
 
 ```bash
-JORDAG_PORT=8793 XDG_CACHE_HOME=$SANDBOX/cache JORDAG_CONFIG=$SANDBOX/config.json $SANDBOX/bin/jordag <arguments>
+python3 jordag.py setup --sandbox /path/to/a/new/folder
 ```
 
-`8793` is only an example; any free port works. Also note:
-- jordag refuses to use another copy's server: it exits 2 and prints the right command for this copy.
-- `stop` and `restart` leave another copy's server alone unless you add `--force`. Ask the user before forcing, since it may be their running copy.
-- Installed skills call whichever `jordag` is first on `PATH`, with the default port. A side-by-side install is for testing from the shell.
+This gives this checkout:
+- its own free port, picked automatically
+- its own cache and config under that folder (the config file doesn't need to exist)
+- links to `bin/` and `skills/` in that folder
 
-`setup --help` lists setup's options. `missing dbt` in setup's output is expected when dbt lives in project virtualenvs; the demo gets one in step 3.
+It saves those settings in `.jordag-local.json` in the repo (gitignored), so every `python3 jordag.py ...` from this checkout uses them automatically. Delete that file to undo.
+
+Afterwards, `python3 jordag.py status` should show:
+- `sandbox yes`
+- `server not running` (or `running, this copy` once you've used it)
+
+`on PATH` still names the other copy. That's fine; just never run the bare `jordag` command, because it's the user's.
+
+In either case, `missing dbt` in setup's output is expected when dbt lives in project virtualenvs. The demo gets one next.
 
 ## 3. Verify with the demo project
-
-Run these from the repo root. `-p demo` points jordag at the demo, so there's no `cd` to lose.
 
 ```bash
 python3 -m venv demo/.venv
 demo/.venv/bin/pip install dbt-duckdb sqlglot
-node test.mjs                                           # expect: "selector ok" and "usage ok"
-jordag query -p demo -s '+customers'                    # expect: "8 nodes selected" (5 model rows, 3 source rows)
-jordag query -p demo --column customers.lifetime_value  # expect: "upstream (3)", ending at shop.raw_payments.amount
-jordag query -p demo -s orders --usage                  # expect: "Usage reads Snowflake ACCESS_HISTORY; this project uses duckdb." and exit code 1
+node test.mjs                                                     # expect: "selector ok" and "usage ok"
+python3 jordag.py query -p demo -s '+customers'                   # expect: "8 nodes selected" (5 model rows, 3 source rows)
+python3 jordag.py query -p demo --column customers.lifetime_value # expect: "upstream (3)", ending at shop.raw_payments.amount
+python3 jordag.py query -p demo -s orders --usage                 # expect: "Usage reads Snowflake ACCESS_HISTORY; this project uses duckdb." and exit code 1
+python3 jordag.py --print demo                                    # expect: a URL on this checkout's port; curl it to get the HTML page
+python3 jordag.py stop                                            # expect: "stopped the server on port …"
 ```
 
-Notes:
-- The first `--column` run compiles the demo and traces every column, which takes a few seconds. dbt-duckdb creates `demo/demo.duckdb` (gitignored) along the way.
-- Every successful `jordag query` prints a `url:` line near the top that opens the same view.
-- `--usage` exits 1 on non-Snowflake projects, so don't chain it with `&&`.
-- To see the UI, run `jordag demo` (it opens the browser), or `jordag --print demo` for the URL to open in an embedded browser.
+What to expect along the way:
+- **pip noise:** pip may warn about its own version, or LibreSSL on macOS's system Python. Both are harmless.
+- **Server:** the first `query` starts a background server on this checkout's port.
+- **Output:** every successful `query` prints a `url:` line near the top, which opens the same view in the browser.
+- **Column trace:** the first `--column` run compiles the demo and traces every column, which takes a few seconds. dbt-duckdb creates `demo/demo.duckdb` (gitignored).
+- **Usage:** `--usage` exits 1 on non-Snowflake projects, so don't chain it with `&&`.
+- **Browser:** to show the user the UI, run `python3 jordag.py demo`, which opens their browser.
 
-When you're done, stop the server you started: `jordag stop`, in the same side-by-side form if you used one.
+**Exit code 2** means another jordag owns the port. jordag refuses to use, stop, or restart another copy's server unless you pass `--force`. Ask the user before forcing, since it may be their running copy.
 
 ## 4. Point it at the user's projects
 
-From inside any of the user's dbt projects, run `jordag`. The project and all its git worktrees appear in the dropdown from then on. To also list projects that haven't been opened yet, add their parent folders to `roots` in `~/.config/jordag/config.json`.
+From inside any of the user's dbt projects, run `jordag` (or `python3 <repo>/jordag.py`). The project and all its git worktrees appear in the dropdown from then on. To also list projects that haven't been opened yet, add their parent folders to `roots` in the config file that `status` shows.
 
 jordag finds dbt in the project's `.venv` or `venv`, then in the main worktree's, then on `PATH`. Parse errors show in the UI's status pill.
 
+The installed skills call whichever `jordag` is first on `PATH`, so they use the normal install, not a sandbox.
+
 ## 5. Usage view (Snowflake only)
 
-Ask the user for these, then write `~/.config/jordag/config.json` (see `config.example.json` and the README's configuration table):
+Ask the user for these, then write the config file that `status` shows (see `config.example.json` and the README's configuration table):
 - The production database and default schema.
 - Whether prod uses bare custom schemas (`"custom"`) or dbt's default prefixing (`"prefixed"`).
 - The Snowflake roles their BI tools use (consumers) and the roles people use (team).
@@ -103,8 +112,8 @@ For Metabase dashboard names, the user sets `METABASE_API_KEY` in their shell an
 
 | Symptom | Fix |
 |---------|-----|
-| `port … is served by another jordag` | Another copy, or an older version of this one, owns the port. Run beside it (see step 2), or, with the user's OK, `jordag restart --force` |
-| `server failed to start` | See `$XDG_CACHE_HOME/jordag/server.log` (default `~/.cache/jordag/server.log`). Usually the port is taken: set `JORDAG_PORT` |
+| Exit code 2: `port … is served by another jordag` | Another copy, or an older version of this one, owns the port. Use `setup --sandbox` (step 2), or, with the user's OK, `restart --force` |
+| `server failed to start` | See `server.log` in the cache folder that `status` shows. Usually the port is taken by something that isn't jordag: rerun `setup --sandbox` to pick another port |
 | Red "parse error" pill | The project's own `dbt parse` fails. Click the pill for the output |
 | Columns view: `No python with sqlglot` | `pip install sqlglot` into the project's dbt venv, or install `uv` |
-| Changes to jordag's own code don't show | `jordag restart` |
+| Changes to jordag's own code don't show | `python3 jordag.py restart` |

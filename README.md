@@ -117,6 +117,8 @@ jordag query --column customers.lifetime_value --up
 
 To put the skills somewhere else, use `jordag setup --skills <dir>`. `--no-skills` skips them.
 
+Already running jordag and want to try another checkout beside it? `python3 jordag.py setup --sandbox <folder>` gives that checkout its own port, cache and config.
+
 `jordag status` shows which copy you're running, its config, cache and port, and whether a server is up. `jordag stop` stops the background server, and `jordag restart` restarts it; run that after updating jordag.
 
 ## How it works

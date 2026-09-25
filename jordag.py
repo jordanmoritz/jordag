@@ -5,7 +5,7 @@
                       starting the background server if it isn't running
   jordag --print      same, but only print the URL
   jordag setup        link the `jordag` command into ~/.local/bin and the agent skills into ~/.claude/skills
-                      (--bin DIR, --skills DIR, --no-skills)
+                      (--bin DIR, --skills DIR, --no-skills; --sandbox DIR to run beside another jordag)
   jordag query ...    DAG / usage / column-lineage lookups from the terminal (see `jordag query --help`)
   jordag status       which copy this is, its config/cache/port, and whether a server (and whose) is running
   jordag serve        run the server in the foreground
@@ -20,6 +20,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -32,7 +33,14 @@ from collections import OrderedDict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-CONFIG_PATH = Path(os.environ.get('JORDAG_CONFIG', '~/.config/jordag/config.json')).expanduser()
+HERE = Path(__file__).resolve().parent
+# written by `jordag setup --sandbox`: this checkout's own port/cache/config, so it can run beside another jordag
+LOCAL_FILE = HERE / '.jordag-local.json'
+try:
+    LOCAL = json.loads(LOCAL_FILE.read_text())
+except (OSError, ValueError):
+    LOCAL = {}
+CONFIG_PATH = Path(os.environ.get('JORDAG_CONFIG') or LOCAL.get('config') or '~/.config/jordag/config.json').expanduser()
 try:
     CFG = json.loads(CONFIG_PATH.read_text())
 except FileNotFoundError:
@@ -40,11 +48,11 @@ except FileNotFoundError:
 except ValueError as e:
     sys.exit('jordag: %s is not valid JSON: %s' % (CONFIG_PATH, e))
 
-PORT = int(os.environ.get('JORDAG_PORT') or CFG.get('port') or 8765)
+PORT = int(os.environ.get('JORDAG_PORT') or LOCAL.get('port') or CFG.get('port') or 8765)
 ROOTS = [Path(p).expanduser() for p in
          (os.environ['JORDAG_ROOTS'].split(':') if os.environ.get('JORDAG_ROOTS') else CFG.get('roots') or []) if p]
-CACHE = Path(os.environ.get('XDG_CACHE_HOME', '~/.cache')).expanduser() / 'jordag'
-HERE = Path(__file__).resolve().parent
+CACHE = Path(os.environ['XDG_CACHE_HOME']).expanduser() / 'jordag' if os.environ.get('XDG_CACHE_HOME') \
+    else Path(LOCAL['cache']) if LOCAL.get('cache') else Path('~/.cache/jordag').expanduser()
 WEB, USAGE_SQL, ENGINE = HERE / 'web', HERE / 'usage.sql', HERE / 'cll.py'
 USAGE_DAYS, USAGE_TTL = 90, 12 * 3600
 # Usage (Snowflake only): where prod models live, and how to read the role behind each query.
@@ -849,9 +857,14 @@ def call(path, method='GET', timeout=0.5):
 
 
 SETUP_HELP = '''usage: jordag setup [--bin DIR] [--skills DIR] [--no-skills]
+       jordag setup --sandbox DIR
 
   Links the `jordag` command into DIR (default ~/.local/bin) and the agent skills in skills/ into
-  DIR (default ~/.claude/skills). Never overwrites anything that isn't already a link to this checkout.'''
+  DIR (default ~/.claude/skills). Never overwrites anything that isn't already a link to this checkout.
+
+  --sandbox DIR runs this checkout beside another jordag: it picks a free port, keeps its cache and
+  config under DIR, links bin/ and skills/ there, and remembers all that in .jordag-local.json
+  (delete that file to undo). Every way of running this checkout then uses the sandbox.'''
 
 
 def setup(args):
@@ -859,7 +872,7 @@ def setup(args):
         return print(SETUP_HELP)
     i = 0
     while i < len(args):
-        if args[i] in ('--bin', '--skills') and i + 1 < len(args):
+        if args[i] in ('--bin', '--skills', '--sandbox') and i + 1 < len(args):
             i += 2
         elif args[i] == '--no-skills':
             i += 1
@@ -879,13 +892,26 @@ def setup(args):
             dst.symlink_to(src)
             print('  linked   %s -> %s' % (dst, src))
 
-    bin_dir = opt('--bin', '~/.local/bin')
+    box = opt('--sandbox', '') if '--sandbox' in args else None
+    if box:
+        box.mkdir(parents=True, exist_ok=True)
+        with socket.socket() as sock:
+            sock.bind(('127.0.0.1', 0))
+            port = sock.getsockname()[1]
+        LOCAL_FILE.write_text(json.dumps({'port': port, 'cache': str(box / 'cache'), 'config': str(box / 'config.json')}, indent=2))
+    bin_dir = box / 'bin' if box else opt('--bin', '~/.local/bin')
     print('jordag setup')
     link(bin_dir / 'jordag', HERE / 'jordag.py')
     if '--no-skills' not in args:
         for d in sorted((HERE / 'skills').iterdir()):
             if (d / 'SKILL.md').is_file():
-                link(opt('--skills', '~/.claude/skills') / d.name, d)
+                link((box / 'skills' if box else opt('--skills', '~/.claude/skills')) / d.name, d)
+    if box:
+        print('\n  sandbox  port %d, cache %s, config %s (optional, may not exist)' % (port, box / 'cache', box / 'config.json'))
+        print('           saved in %s; delete it to undo' % LOCAL_FILE)
+        print('  next     run this checkout as `python3 %s ...` or `%s ...`.' % (HERE / 'jordag.py', bin_dir / 'jordag'))
+        print('           A bare `jordag` on your PATH is another copy; leave it alone.')
+        return
     on_path = shutil.which('jordag')
     if str(bin_dir) not in os.environ.get('PATH', '').split(':'):
         print('\n  note: %s is not on your PATH; add it, or run %s directly' % (bin_dir, HERE / 'jordag.py'))
@@ -908,7 +934,7 @@ def status():
         else 'running, ANOTHER copy: %s' % (pong.get('home') or 'an older jordag')
     path = 'not on PATH' if not on_path else 'this copy' if os.path.realpath(on_path) == me \
         else 'ANOTHER copy: %s' % os.path.realpath(on_path)
-    for k, v in (('this copy', me), ('config', '%s (%s)' % (CONFIG_PATH, 'found' if CONFIG_PATH.is_file() else 'not found, using defaults')),
+    for k, v in (('this copy', me), ('sandbox', 'yes (%s)' % LOCAL_FILE if LOCAL else 'no'), ('config', '%s (%s)' % (CONFIG_PATH, 'found' if CONFIG_PATH.is_file() else 'not found, using defaults')),
                  ('cache', CACHE), ('port', PORT), ('server', server), ('on PATH', path)):
         print('  %-10s %s' % (k, v))
 
@@ -932,9 +958,10 @@ def main():
     if args[:1] in (['stop'], ['restart']):
         pong = call('/api/ping')
         if pong and pong.get('home') != str(HERE) and '--force' not in flags:
-            sys.exit('jordag: port %d is served by another jordag (%s), so %s left it alone.\n'
-                     '  It may be someone\'s running copy. Add --force to %s it anyway.'
-                     % (PORT, pong.get('home') or 'an older version', args[0], args[0]))
+            sys.stderr.write('jordag: port %d is served by another jordag (%s), so %s left it alone.\n'
+                             '  It may be someone\'s running copy. Add --force to %s it anyway.\n'
+                             % (PORT, pong.get('home') or 'an older version', args[0], args[0]))
+            sys.exit(2)
         running = call('/api/quit', 'POST')
         for _ in range(20):
             if not call('/api/ping'):
@@ -958,8 +985,7 @@ def main():
     if pong.get('home') != str(HERE):
         me = os.path.realpath(HERE / 'jordag.py')
         sys.stderr.write('jordag: port %d is served by another jordag (%s).\n'
-                         '  Run this copy beside it:\n'
-                         '    JORDAG_PORT=<free port> XDG_CACHE_HOME=<dir> JORDAG_CONFIG=<dir>/config.json python3 %s ...\n'
+                         '  Run this copy beside it:  python3 %s setup --sandbox <new folder>\n'
                          '  Or replace it (it may be someone\'s running copy; ask first):\n'
                          '    python3 %s restart --force\n' % (PORT, pong.get('home') or 'an older version', me, me))
         sys.exit(2)
