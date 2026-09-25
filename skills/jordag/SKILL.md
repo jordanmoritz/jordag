@@ -18,7 +18,7 @@ It has three views:
 All of them use `jordag query`, run from inside the dbt project.
 - It starts the server if needed and waits for the parse.
 - It prints results plus a `url:` line that opens the same view.
-- `-p <dir>` targets another project or worktree. `curl -s 127.0.0.1:8765/api/projects` lists them with their branches.
+- `-p <dir>` targets another project or worktree. To list them with their branches, curl `<server>/api/projects`, where `<server>` is the scheme, host and port from any `url:` line.
 
 If `jordag` isn't on PATH, run `python3 <jordag checkout>/jordag.py setup` first (see its README).
 
@@ -37,6 +37,6 @@ If `jordag` isn't on PATH, run `python3 <jordag checkout>/jordag.py setup` first
 5. **Summarize in a sentence or two** what they're looking at: how many nodes changed, which are new vs modified, and any downstream exposures. Use the command output for this, not screenshots.
 
 ## Notes
-- jordag never writes to the project's `target/`. Its parses and compiles go to `~/.cache/jordag`.
+- jordag never writes to the project's `target/`. Its parses and compiles go to `$XDG_CACHE_HOME/jordag` (default `~/.cache/jordag`).
 - If the output shows a parse error, the project has a dbt parse error. Tell the user; the viewer keeps showing the last good graph.
 - After updating jordag itself, run `jordag restart`.

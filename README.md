@@ -30,7 +30,7 @@ Then, from inside any dbt project or worktree:
 jordag
 ```
 
-That starts a background server at `http://127.0.0.1:8765` and opens your browser. One server handles every project. Projects you open are remembered, and each one brings along all of its git worktrees.
+That starts a background server at `http://127.0.0.1:8765` (set `JORDAG_PORT` to change it) and opens your browser. One server handles every project. Projects you open are remembered, and each one brings along all of its git worktrees.
 
 ### Try it on the demo first
 
@@ -110,8 +110,8 @@ Environment variables:
 They all run `jordag query`, which you can use yourself:
 
 ```bash
-jordag query -s '1+state:modified+'                    # what my branch changed
-jordag query -s 'path:models/marts' --usage --verdict unused
+jordag query -s '1+state:modified+'                    # what my branch changed (empty until you change a model)
+jordag query -s 'path:models/marts' --usage --verdict unused   # Snowflake projects only
 jordag query --column customers.lifetime_value --up
 ```
 
@@ -120,7 +120,7 @@ To put the skills somewhere else, use `jordag setup --skills <dir>`. `--no-skill
 ## How it works
 
 - `jordag.py`: a dependency-free Python server and CLI.
-  - It runs `dbt parse` into `~/.cache/jordag`, never into your project's `target/`, whenever files change.
+  - It runs `dbt parse` into `~/.cache/jordag` (or `$XDG_CACHE_HOME/jordag`), never into your project's `target/`, whenever files change.
   - It parses your branch's merge-base once per commit, for `state:modified`.
   - It runs [`usage.sql`](usage.sql) through `dbt show`.
 - `cll.py`: the column-lineage engine. It runs under your dbt venv's Python, which needs sqlglot; if that venv lacks it, it falls back to `uv run --with sqlglot`.

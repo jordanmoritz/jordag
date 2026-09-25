@@ -796,7 +796,7 @@ class Handler(BaseHTTPRequestHandler):
         q = dict(urllib.parse.parse_qsl(u.query))
         try:
             if u.path == '/api/ping':
-                return self.send(200, {'ok': True, 'pid': os.getpid()})
+                return self.send(200, {'ok': True, 'pid': os.getpid(), 'home': str(HERE)})
             if u.path == '/api/projects':
                 return self.send(200, find_projects())
             if u.path == '/api/quit' and method == 'POST':
@@ -847,7 +847,24 @@ def call(path, method='GET', timeout=0.5):
         return None
 
 
+SETUP_HELP = '''usage: jordag setup [--bin DIR] [--skills DIR] [--no-skills]
+
+  Links the `jordag` command into DIR (default ~/.local/bin) and the agent skills in skills/ into
+  DIR (default ~/.claude/skills). Never overwrites anything that isn't already a link to this checkout.'''
+
+
 def setup(args):
+    if {'-h', '--help'} & set(args):
+        return print(SETUP_HELP)
+    i = 0
+    while i < len(args):
+        if args[i] in ('--bin', '--skills') and i + 1 < len(args):
+            i += 2
+        elif args[i] == '--no-skills':
+            i += 1
+        else:
+            sys.exit('jordag setup: unexpected argument %r\n\n%s' % (args[i], SETUP_HELP))
+
     def opt(name, default):
         return Path(args[args.index(name) + 1] if name in args else default).expanduser()
 
@@ -868,8 +885,12 @@ def setup(args):
         for d in sorted((HERE / 'skills').iterdir()):
             if (d / 'SKILL.md').is_file():
                 link(opt('--skills', '~/.claude/skills') / d.name, d)
+    on_path = shutil.which('jordag')
     if str(bin_dir) not in os.environ.get('PATH', '').split(':'):
         print('\n  note: %s is not on your PATH; add it, or run %s directly' % (bin_dir, HERE / 'jordag.py'))
+    elif on_path and os.path.realpath(on_path) != os.path.realpath(HERE / 'jordag.py'):
+        print('\n  note: `jordag` on your PATH is a different copy (%s); run %s to use this one'
+              % (os.path.realpath(on_path), bin_dir / 'jordag'))
     for tool, why in (('dbt', 'parsing projects (or keep dbt in a .venv / venv inside each project)'),
                       ('node', '`jordag query` and the agent skills'), ('git', 'worktrees and state:modified')):
         if not shutil.which(tool):
@@ -893,13 +914,13 @@ def main():
     if args[:1] == ['serve']:
         return serve()
     if args[:1] in (['stop'], ['restart']):
-        call('/api/quit', 'POST')
+        running = call('/api/quit', 'POST')
         for _ in range(20):
             if not call('/api/ping'):
                 break
             time.sleep(0.1)
         if args[0] == 'stop':
-            return
+            return print('jordag: %s on port %d' % ('stopped the server' if running else 'no server running', PORT))
         args = args[1:]
     if not call('/api/ping'):
         CACHE.mkdir(parents=True, exist_ok=True)
@@ -912,6 +933,10 @@ def main():
             time.sleep(0.1)
         else:
             sys.exit('jordag: server failed to start, see %s' % (CACHE / 'server.log'))
+    pong = call('/api/ping') or {}
+    if pong.get('home') != str(HERE):
+        print('jordag: port %d is already served by %s; set JORDAG_PORT to run this copy instead'
+              % (PORT, pong.get('home') or 'another jordag'), file=sys.stderr)
     here = Path(args[0] if args else '.').resolve()
     proj = next((d for d in [here, *here.parents] if (d / 'dbt_project.yml').is_file()), None)
     url = 'http://127.0.0.1:%d/' % PORT + ('?p=' + urllib.parse.quote(str(proj)) if proj else '')

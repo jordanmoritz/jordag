@@ -18,12 +18,18 @@ If `node` is missing, the viewer still works but the skills won't. Tell the user
 python3 jordag.py setup
 ```
 
-This links `~/.local/bin/jordag` and `~/.claude/skills/jordag*`.
-- To install somewhere else, pass `--bin <dir>` or `--skills <dir>`.
-- If it reports `skipped ... already exists`, a different copy is installed there. Ask the user before replacing it.
-- If `~/.local/bin` isn't on `PATH`, use `python3 <repo>/jordag.py` wherever these steps say `jordag`, and tell the user to add it to `PATH`.
+This links `~/.local/bin/jordag` and `~/.claude/skills/jordag*`. Run `python3 jordag.py setup --help` for its options; pass `--bin <dir>` or `--skills <dir>` to install somewhere else.
 
-If the user already runs a jordag server on the default port, set `JORDAG_PORT` (e.g. `8799`) for the steps below so you don't talk to their running copy. The query output's `url:` always shows which server answered.
+**Make sure `jordag` means this checkout.** Run `readlink -f "$(command -v jordag)"`; it should end in this repo's `jordag.py`.
+- If it doesn't, or setup printed `skipped` for the bin link (another copy is installed), or you used `--bin`, use `<bin>/jordag` or `python3 <repo>/jordag.py` wherever these steps say `jordag`.
+- Ask the user before replacing another copy.
+- If `~/.local/bin` isn't on `PATH`, tell the user to add it.
+
+**Check whether another jordag server is running:** `curl -s 127.0.0.1:8765/api/ping`.
+- A reply whose `home` isn't this repo (or has no `home`) is another copy.
+- If so, pick a free port and prefix every command below with `JORDAG_PORT=<port> XDG_CACHE_HOME=<some dir>`. That gives this copy its own server and cache.
+- Agent shells often don't keep `export`s between calls, so put the variables on each command.
+- jordag also warns on stderr when it finds another copy serving its port.
 
 ## 3. Verify with the demo project
 
@@ -37,7 +43,9 @@ jordag query --column customers.lifetime_value   # expect: 3 upstream, ending at
 jordag query -s orders --usage                   # expect: "Usage reads Snowflake ACCESS_HISTORY; this project uses duckdb."
 ```
 
-The first `--column` run compiles the demo and traces every column, which takes a few seconds.
+The first `--column` run compiles the demo and traces every column, which takes a few seconds. dbt-duckdb creates `demo/demo.duckdb` (gitignored) along the way.
+
+Every successful `jordag query` ends with a `url:` line that opens the same view. The `--usage` check exits 1 with that message on non-Snowflake projects, which is expected for the demo.
 
 To see the UI, run `jordag` (it opens the browser), or `jordag --print` to get the URL for an embedded browser.
 
@@ -64,7 +72,7 @@ For Metabase dashboard names, the user sets `METABASE_API_KEY` in their shell an
 
 | Symptom | Fix |
 |---------|-----|
-| `server failed to start` | See `~/.cache/jordag/server.log`. Usually the port is taken: set `JORDAG_PORT` |
+| `server failed to start` | See `$XDG_CACHE_HOME/jordag/server.log` (default `~/.cache/jordag/server.log`). Usually the port is taken: set `JORDAG_PORT` |
 | Red "parse error" pill | The project's own `dbt parse` fails. Click the pill for the output |
 | Columns view: `No python with sqlglot` | `pip install sqlglot` into the project's dbt venv, or install `uv` |
 | Changes to jordag's own code don't show | `jordag restart` |
