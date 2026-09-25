@@ -24,6 +24,8 @@ cd jordag
 python3 jordag.py setup        # links the `jordag` command into ~/.local/bin and the agent skills into ~/.claude/skills
 ```
 
+Already have jordag installed? Run `python3 jordag.py status` first; to try this checkout beside the other one, use `python3 jordag.py setup --sandbox <folder>`. Setting it up with an agent? Point it at [AGENTS.md](AGENTS.md).
+
 Then, from inside any dbt project or worktree:
 
 ```bash
@@ -124,7 +126,7 @@ Already running jordag and want to try another checkout beside it? `python3 jord
 ## How it works
 
 - `jordag.py`: a dependency-free Python server and CLI.
-  - It runs `dbt parse` into `~/.cache/jordag` (or `$XDG_CACHE_HOME/jordag`), never into your project's `target/`, whenever files change.
+  - It runs `dbt parse` into its cache (`~/.cache/jordag`, or whatever `jordag status` shows), never into your project's `target/`, whenever files change.
   - It parses your branch's merge-base once per commit, for `state:modified`.
   - It runs [`usage.sql`](usage.sql) through `dbt show`.
 - `cll.py`: the column-lineage engine. It runs under your dbt venv's Python, which needs sqlglot; if that venv lacks it, it falls back to `uv run --with sqlglot`.

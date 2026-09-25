@@ -1,16 +1,24 @@
 # Setting up jordag (for AI agents)
 
-Follow these steps in order to install jordag for a user and prove it works. Every command is non-interactive. Run them from the repo root.
+Follow these steps in order to install jordag for a user and prove it works. Every command is non-interactive. Step 0 runs wherever the clone should go; everything after it runs from the repo root.
 
 Every jordag command in steps 2 and 3 runs this checkout as `python3 jordag.py ...`, so they work the same whether or not another jordag is installed. Keep it that way: a bare `jordag` on `PATH` may be a different copy.
 
 ## 0. Get the code
 
+If `gh auth status` succeeds, clone with the GitHub CLI; it works for private repos without prompting:
+
 ```bash
-git clone https://github.com/jordanmoritz/jordag.git && cd jordag
+gh repo clone jordanmoritz/jordag && cd jordag
 ```
 
-If the repo is private to the user and git has no credential helper, use `gh repo clone jordanmoritz/jordag && cd jordag` instead, so nothing prompts for a password.
+Otherwise use git, with prompts turned off so it can't hang:
+
+```bash
+GIT_TERMINAL_PROMPT=0 git clone https://github.com/jordanmoritz/jordag.git && cd jordag
+```
+
+If that fails with an authentication error, the repo is private: ask the user to sign in with `gh auth login` (or share access), then retry.
 
 ## 1. Check prerequisites
 
@@ -20,7 +28,9 @@ git --version
 node --version      # 18 or newer (needed for `jordag query` and the skills)
 ```
 
-If `node` is missing, the viewer still works but the skills won't. Tell the user.
+If Python is older than 3.9, stop and tell the user; jordag needs 3.9+.
+
+If `node` is missing, the viewer still works, but `jordag query` and the skills don't. Tell the user. In step 3, skip `node test.mjs` and the `query` lines; `--print`, the two `curl` checks, and `stop` still verify the install.
 
 ## 2. Install
 
@@ -77,8 +87,10 @@ node test.mjs                                                     # expect: "sel
 python3 jordag.py query -p demo -s '+customers'                   # expect: "8 nodes selected" (5 model rows, 3 source rows)
 python3 jordag.py query -p demo --column customers.lifetime_value # expect: "upstream (3)", ending at shop.raw_payments.amount
 python3 jordag.py query -p demo -s orders --usage                 # expect: "Usage reads Snowflake ACCESS_HISTORY; this project uses duckdb." and exit code 1
-python3 jordag.py --print demo                                    # expect: a URL on this checkout's port; curl it to get the HTML page
-curl -s "$(python3 jordag.py --print demo | sed 's/?.*//')api/graph?p=$(python3 -c 'import urllib.parse,os;print(urllib.parse.quote(os.path.abspath("demo"),safe=""))')" | head -c 200   # expect: JSON with "nodes"
+python3 jordag.py --print demo                                    # expect: a URL on this checkout's port
+curl -s "$(python3 jordag.py --print demo)" | head -c 15                           # expect: <!doctype html>
+curl -s "$(python3 jordag.py --print demo | sed 's/?.*//')api/graph?p=$(python3 -c 'import urllib.parse,os;print(urllib.parse.quote(os.path.abspath("demo"),safe=""))')" \
+  | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["nodes"]), "nodes")'   # expect: 13 nodes (tests included)
 python3 jordag.py stop                                            # expect: "stopped the server on port …"
 ```
 
@@ -91,6 +103,8 @@ What to expect along the way:
 - **Browser:** a bare `python3 jordag.py <project>` opens the user's browser, so use `--print` unless you mean to show them the UI.
 - **README examples:** they're written for a person with `jordag` on `PATH`, standing inside a project. You're at the repo root, so write `python3 jordag.py` for `jordag` and add `-p demo`, e.g. `python3 jordag.py query -p demo --column customers.lifetime_value --up`. For the README's "Try it on the demo", that's `python3 jordag.py --print demo`.
   The `--usage` example exits 1 on the demo with the Snowflake-only message, which is expected.
+
+**What setup leaves behind** (all gitignored): `.jordag-local.json` if you sandboxed, `demo/.venv/`, `demo/demo.duckdb`, plus the sandbox folder or the links in `~/.local/bin` and `~/.claude/skills`. Delete them to undo.
 
 **Exit code 2** means another jordag owns the port. jordag refuses to use, stop, or restart another copy's server unless you pass `--force`. Ask the user before forcing, since it may be their running copy.
 
