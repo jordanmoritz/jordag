@@ -38,9 +38,13 @@ HERE = Path(__file__).resolve().parent
 LOCAL_FILE = HERE / '.jordag-local.json'
 try:
     LOCAL = json.loads(LOCAL_FILE.read_text())
+    for k in ('cache', 'config'):  # paths are absolute, but resolve any relative one against the checkout, not the cwd
+        if LOCAL.get(k):
+            LOCAL[k] = str((HERE / Path(LOCAL[k]).expanduser()).resolve())
 except (OSError, ValueError):
     LOCAL = {}
-CONFIG_PATH = Path(os.environ.get('JORDAG_CONFIG') or LOCAL.get('config') or '~/.config/jordag/config.json').expanduser()
+# a sandbox's own settings win over the environment, so it stays isolated from the copy it runs beside
+CONFIG_PATH = Path(LOCAL.get('config') or os.environ.get('JORDAG_CONFIG') or '~/.config/jordag/config.json').expanduser()
 try:
     CFG = json.loads(CONFIG_PATH.read_text())
 except FileNotFoundError:
@@ -48,11 +52,11 @@ except FileNotFoundError:
 except ValueError as e:
     sys.exit('jordag: %s is not valid JSON: %s' % (CONFIG_PATH, e))
 
-PORT = int(os.environ.get('JORDAG_PORT') or LOCAL.get('port') or CFG.get('port') or 8765)
+PORT = int(LOCAL.get('port') or os.environ.get('JORDAG_PORT') or CFG.get('port') or 8765)
 ROOTS = [Path(p).expanduser() for p in
          (os.environ['JORDAG_ROOTS'].split(':') if os.environ.get('JORDAG_ROOTS') else CFG.get('roots') or []) if p]
-CACHE = Path(os.environ['XDG_CACHE_HOME']).expanduser() / 'jordag' if os.environ.get('XDG_CACHE_HOME') \
-    else Path(LOCAL['cache']) if LOCAL.get('cache') else Path('~/.cache/jordag').expanduser()
+CACHE = Path(LOCAL['cache']) if LOCAL.get('cache') \
+    else Path(os.environ.get('XDG_CACHE_HOME') or '~/.cache').expanduser() / 'jordag'
 WEB, USAGE_SQL, ENGINE = HERE / 'web', HERE / 'usage.sql', HERE / 'cll.py'
 USAGE_DAYS, USAGE_TTL = 90, 12 * 3600
 # Usage (Snowflake only): where prod models live, and how to read the role behind each query.
@@ -475,6 +479,8 @@ class Project:
                 r = run_dbt(dbt, 'parse', self.path, target)
             if r.returncode:
                 raise RuntimeError(tail(r.output) or 'dbt parse failed with exit code %d' % r.returncode)
+            if not self.manifest.is_file():
+                raise RuntimeError('dbt parse finished but wrote no manifest at %s' % self.manifest)
             # stamp the manifest with the source mtime it reflects, so edits made mid-parse still read as stale
             os.utime(self.manifest, (time.time(), src))
             self.error, self.failed_src = None, None
@@ -892,7 +898,7 @@ def setup(args):
             dst.symlink_to(src)
             print('  linked   %s -> %s' % (dst, src))
 
-    box = opt('--sandbox', '') if '--sandbox' in args else None
+    box = opt('--sandbox', '').resolve() if '--sandbox' in args else None
     if box:
         box.mkdir(parents=True, exist_ok=True)
         if LOCAL and (call('/api/ping') or {}).get('home') == str(HERE):

@@ -62,7 +62,7 @@ const waitFor = async (what, fn, secs = 180) => {
 await waitFor('jordag to parse', async () => {
   const s = await get(`/api/status?${q}&auto=1`);
   if (s.parsing || (s.stale && !s.error) || s.base?.status === 'building') return null;
-  if (s.error) console.error(`warning: dbt parse failed, showing the last good manifest:\n${s.error.split('\n').slice(-8).join('\n')}\n`);
+  if (s.error) console.error(`warning: dbt parse failed${s.mtime ? ', showing the last good manifest' : ''}:\n${s.error.split('\n').slice(-8).join('\n')}\n`);
   return s;
 });
 
